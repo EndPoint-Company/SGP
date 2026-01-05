@@ -11,10 +11,8 @@ type ProcessedConsulta = Consulta & {
   participantName: string;
 };
 
-// Este tipo agora corresponde ao que o DayDetailPanel espera.
 type ChildComponentStatus = 'aguardando aprovacao' | 'confirmada' | 'cancelada' | 'passada';
 
-// ATUALIZADO: As props foram ajustadas para uma melhor comunicação com o componente pai.
 interface ScheduleManagerProps {
   userRole: "aluno" | "psicologo";
   currentUserId: string;
@@ -44,7 +42,15 @@ export default function ScheduleManager({
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const formatDateKey = (date: Date) => date.toISOString().split("T")[0];
+
+  // ✅ CORREÇÃO 1: A chave da data agora é formatada usando a data local.
+  // Isso impede que a data mude para o dia anterior devido ao fuso horário.
+  const formatDateKey = (date: Date) => {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const day = date.getDate().toString().padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
 
   const handleDayClick = (day: Date) => {
     if (isSelectionMode) return;
@@ -96,9 +102,32 @@ export default function ScheduleManager({
     }
   };
 
+  // ✅ CORREÇÃO 2: Ajusta cada horário para frente em 3 horas antes de salvar.
+  // Isso converte o horário local para UTC, mantendo a data correta.
   const handleFinalSave = async (newlyAddedAvailability: Record<string, string[]>) => {
+    const availabilityToSave: Record<string, string[]> = {};
+
+    for (const dateKey in newlyAddedAvailability) {
+      availabilityToSave[dateKey] = newlyAddedAvailability[dateKey].map(time => {
+        const [hours, minutes] = time.split(':').map(Number);
+        
+        // Cria um objeto Date com a data e hora locais corretas
+        const localDate = new Date(dateKey);
+        localDate.setHours(hours, minutes);
+
+        // Adiciona 3 horas para converter para UTC
+        localDate.setHours(localDate.getHours() + 3);
+
+        // Formata o novo horário de volta para o formato HH:mm
+        const newHours = localDate.getHours().toString().padStart(2, '0');
+        const newMinutes = localDate.getMinutes().toString().padStart(2, '0');
+        
+        return `${newHours}:${newMinutes}`;
+      });
+    }
+
     if (onSaveAvailability) {
-      await onSaveAvailability(newlyAddedAvailability);
+      await onSaveAvailability(availabilityToSave);
       onShowToast?.("Novos horários disponibilizados!");
     }
     setPendingSelectedDays([]);
@@ -138,17 +167,15 @@ export default function ScheduleManager({
   const isSidebarOpen = isTimePanelOpen || !!selectedDayForDetail;
   const calendarRole = userRole === 'aluno' ? 'aluno' : 'psicologo';
 
-  // CORRIGIDO: Garante que a prop 'horario' seja passada para o ContinuousCalendar.
   const calendarEvents = useMemo(() => {
     return consultas.map(c => ({ 
         ...c,
-        horario: c.inicio, // Mapeia 'inicio' para 'horario'
+        horario: c.inicio,
         pacienteId: c.alunoId, 
         status: c.status,
-     }));
+      }));
   }, [consultas]);
 
-  // CORRIGIDO: Ajusta o mapeamento de status para evitar o erro de tipo.
   const detailPanelEvents = useMemo(() => {
     if (!selectedDayForDetail) return [];
     

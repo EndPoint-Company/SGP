@@ -317,7 +317,7 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({
                               let pillColorClasses = "bg-gray-100 text-gray-800";
                               switch (event.status) {
                                 case "confirmada": pillColorClasses = "bg-blue-100 text-blue-800"; break;
-                                case "aguardando_aprovacao": pillColorClasses = "bg-yellow-100 text-yellow-800"; break;
+                                case "aguardando aprovacao": pillColorClasses = "bg-yellow-100 text-yellow-800"; break;
                                 case "concluida": pillColorClasses = "bg-slate-200 text-slate-500"; break;
                               }
 

@@ -1,3 +1,5 @@
+// src/features/home/components/AppointmentsSection.tsx
+
 import React from 'react';
 import AppointmentCard from '../../../features/appointments/components/AppointmentCard';
 import RequestCard from '../../../features/appointments/components/RequestCard';

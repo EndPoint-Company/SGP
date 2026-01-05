@@ -1,159 +1,71 @@
 // src/pages/psychologist/PsychologistSchedulePage.tsx
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useMemo, useState } from 'react';
 import PsychologistLayout from '../../layouts/PsychologistLayout';
 import ScheduleManager from '../../features/schedule/components/ScheduleManager';
 import { useAuth } from '../../features/auth/hooks/useAuth';
-import { useUserData, type Aluno } from '../../contexts/UserDataProvider';
-import { getConsultasByPsicologoId } from '../../features/appointments/services/appointmentService';
-// ATUALIZADO: Importando a função 'createHorario' no singular.
-import { getHorariosByPsicologoId, createHorario, deleteHorario } from '../../features/horarios/services/horarioService';
-import type { HorarioDisponivel, NewHorario } from '../../features/horarios/services/horarioService';
-import type { Consulta } from '../../features/appointments/types';
+import { useSchedule } from '../../features/schedule/hooks/useSchedule';
+import { useProcessedAppointments } from '../../features/appointments/hooks/useProcessedAppointments';
 import { Toast } from '../../components/ui/Toast';
 
-export type ProcessedEvent = Consulta & {
-  participantName: string;
-};
-
-type AlunoComNomesPossiveis = Aluno & {
-  name?: string;
-  displayName?: string;
-};
-
 export default function PsychologistSchedulePage() {
-  const { user, isLoading: isAuthLoading } = useAuth();
-  const { findAlunoById, isLoading: isUserDataLoading } = useUserData();
-  
-  const [consultas, setConsultas] = useState<Consulta[]>([]);
-  const [horarios, setHorarios] = useState<HorarioDisponivel[]>([]);
-  const [isDataLoading, setIsDataLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
   const [toast, setToast] = useState({ isVisible: false, message: '' });
-  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const { horarios, saveAvailability, blockDay, isLoading: isScheduleLoading } = useSchedule(user?.uid);
+  const { consultas, isLoading: isAppointmentsLoading } = useProcessedAppointments(user?.uid || '', 'psicologo');
 
-  const fetchData = async (userId: string) => {
-    setIsDataLoading(true);
-    try {
-      const [consultasData, horariosData] = await Promise.all([
-        getConsultasByPsicologoId(userId),
-        getHorariosByPsicologoId(userId)
-      ]);
-      setConsultas(consultasData);
-      setHorarios(horariosData);
-    } catch {
-      setError('Não foi possível carregar os dados da agenda.');
-    } finally {
-      setIsDataLoading(false);
-    }
+  const showToast = (message: string) => {
+    setToast({ isVisible: true, message });
+    setTimeout(() => setToast({ isVisible: false, message: '' }), 3000);
   };
 
-  useEffect(() => {
-    if (!isAuthLoading && user?.uid) {
-      fetchData(user.uid);
-    }
-  }, [user, isAuthLoading]);
-
-  const handleSaveAvailability = async (newlyAddedAvailability: Record<string, string[]>) => {
-    if (!user?.uid) return;
-    
-    const novosHorarios: NewHorario[] = [];
-    Object.entries(newlyAddedAvailability).forEach(([date, times]) => {
-      times.forEach(time => {
-        const [hour, minute] = time.split(':');
-        const startDate = new Date(`${date}T00:00:00.000Z`);
-        startDate.setUTCHours(Number(hour), Number(minute));
-        
-        const endDate = new Date(startDate);
-        endDate.setUTCHours(startDate.getUTCHours() + 1);
-
-        novosHorarios.push({
-          psicologoId: user.uid,
-          inicio: startDate.toISOString(),
-          fim: endDate.toISOString(),
-        });
-      });
-    });
-
-    try {
-      // ATUALIZADO: Faz um loop e envia uma requisição para cada novo horário.
-      await Promise.all(novosHorarios.map(horario => createHorario(horario)));
-      showToast("Disponibilidade salva com sucesso!");
-      fetchData(user.uid);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Erro desconhecido.");
-    }
-  };
-
-  const handleBlockDay = async (dayToBlock: Date) => {
-    const dateKey = dayToBlock.toISOString().split("T")[0];
-    const slotsToDelete = horarios.filter(h => h.inicio.startsWith(dateKey) && h.status === 'disponivel');
-
-    if (slotsToDelete.length === 0) {
-      showToast("Este dia não possui horários disponíveis para bloquear.");
-      return;
-    }
-
-    try {
-      await Promise.all(slotsToDelete.map(slot => deleteHorario(slot.id)));
-      showToast("Dia bloqueado com sucesso!");
-      fetchData(user!.uid);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Erro ao bloquear o dia.");
-    }
-  };
-
-  const processedConsultas = useMemo((): ProcessedEvent[] => {
-    if (!Array.isArray(consultas)) return [];
-    return consultas.map(item => {
-      const aluno = findAlunoById(item.alunoId) as AlunoComNomesPossiveis;
-      const participantName = aluno.nome || aluno.name || aluno.displayName || 'Desconhecido';
-      return { ...item, participantName };
-    });
-  }, [consultas, findAlunoById]);
-
-  const availabilityRecord = useMemo((): Record<string, string[]> => {
+  // Transforma horários para o formato de record da agenda
+  const availabilityRecord = useMemo(() => {
     const record: Record<string, string[]> = {};
-    horarios.forEach(h => {
-      if (h.status === 'disponivel') {
-        const dateKey = h.inicio.split('T')[0];
-        const time = new Date(h.inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
-        if (!record[dateKey]) {
-          record[dateKey] = [];
-        }
-        record[dateKey].push(time);
-      }
+    horarios.filter(h => h.status === 'disponivel').forEach(h => {
+      const dateKey = h.inicio.split('T')[0];
+      const time = new Date(h.inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      if (!record[dateKey]) record[dateKey] = [];
+      record[dateKey].push(time);
     });
     return record;
   }, [horarios]);
 
-  const showToast = (message: string) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast({ isVisible: true, message });
-    toastTimerRef.current = setTimeout(() => {
-      setToast({ isVisible: false, message: '' });
-    }, 3000);
-  };
-
-  const isLoading = isAuthLoading || isDataLoading || isUserDataLoading;
+  if (isScheduleLoading || isAppointmentsLoading) return <PsychologistLayout><p className="p-10 text-center">Carregando agenda...</p></PsychologistLayout>;
 
   return (
     <PsychologistLayout>
-      <div className="h-full w-full relative">
-        {isLoading && <p className="text-center p-8">A carregar agenda...</p>}
-        {error && <p className="text-center p-8 text-red-500">{error}</p>}
-        {!isLoading && !error && user && (
-          <ScheduleManager
-            userRole="psicologo"
-            currentUserId={user.uid}
-            consultas={processedConsultas}
-            availability={availabilityRecord}
-            onSaveAvailability={handleSaveAvailability}
-            onBlockDay={handleBlockDay}
-          />
-        )}
-        <Toast message={toast.message} isVisible={toast.isVisible} />
-      </div>
+      <ScheduleManager
+        userRole="psicologo"
+        currentUserId={user?.uid || ''}
+        consultas={consultas}
+        availability={availabilityRecord}
+        onSaveAvailability={async (added) => {
+          // Lógica de transformação delegada para manter o ScheduleManager limpo
+          await saveAvailability(transformToNewHorarios(added, user!.uid));
+          showToast("Disponibilidade salva!");
+        }}
+        onBlockDay={async (day) => {
+          await blockDay(day.toISOString().split("T")[0]);
+          showToast("Dia bloqueado!");
+        }}
+      />
+      <Toast message={toast.message} isVisible={toast.isVisible} />
     </PsychologistLayout>
   );
+}
+
+// Helper para converter o formato da UI para o modelo de dados
+function transformToNewHorarios(availability: Record<string, string[]>, psicologoId: string) {
+  const novos: any[] = [];
+  Object.entries(availability).forEach(([date, times]) => {
+    times.forEach(time => {
+      const start = new Date(`${date}T${time}:00Z`);
+      const end = new Date(start);
+      end.setHours(start.getHours() + 1);
+      novos.push({ psicologoId, inicio: start.toISOString(), fim: end.toISOString() });
+    });
+  });
+  return novos;
 }

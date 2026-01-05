@@ -1,128 +1,87 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import {
-  Home,
-  LayoutDashboard,
-  Calendar,
-  Menu,
-  LogOut,
-} from "lucide-react";
+import React from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../features/auth/hooks/useAuth';
+import { 
+  LayoutDashboard, 
+  Calendar, 
+  Users, 
+  LogOut, 
+  User as UserIcon 
+} from 'lucide-react';
 
-export default function PsychologistLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [collapsed, setCollapsed] = useState(false);
-
+export default function PsychologistLayout({ children }: { children: React.ReactNode }) {
+  const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const navItems = [
-    { label: "Início", icon: Home, to: "/psychologist/home" },
-    {
-      label: "Atendimentos",
-      icon: LayoutDashboard,
-      to: "/psychologist/appointments",
-    },
-    { label: "Agenda", icon: Calendar, to: "/psychologist/schedule" },
+  const menuItems = [
+    { path: '/psychologist/home', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/psychologist/appointments', label: 'Agendamentos', icon: Users },
+    { path: '/psychologist/schedule', label: 'Minha Agenda', icon: Calendar },
   ];
 
-  const isActive = (path: string) => location.pathname === path;
-
-  const handleLogout = () => {
-    navigate("/login");
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
   };
 
   return (
-    <div className="flex h-screen bg-white">
-      <aside
-        className={`bg-white flex flex-col border-r border-gray-200 transition-all duration-300 ${
-          collapsed ? "w-20" : "w-64"
-        }`}
-      >
-        <div className="px-4 pt-4 pb-2 flex flex-col gap-3">
-          {collapsed ? (
-            <>
-              <div className="flex justify-center">
-                <button
-                  onClick={() => setCollapsed(false)}
-                  className="text-gray-500 hover:text-gray-800"
-                >
-                  <Menu size={20} />
-                </button>
-              </div>
-              <div className="flex justify-center mt-2">
-                <img
-                  src="https://i.pravatar.cc/40"
-                  alt="Avatar"
-                  className="w-9 h-9 rounded-full"
-                />
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <img
-                  src="https://i.pravatar.cc/40"
-                  alt="Avatar"
-                  className="w-9 h-9 rounded-full"
-                />
-                <div className="leading-tight">
-                  <h2 className="font-semibold text-sm">Ester Ravette</h2>
-                  <p className="text-xs text-gray-500">Psicólogo(a)</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setCollapsed(true)}
-                className="text-gray-500 hover:text-gray-800"
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      {/* Sidebar */}
+      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+        <div className="p-6">
+          <h1 className="text-xl font-bold text-blue-600">SGP - Psicólogo</h1>
+        </div>
+
+        <nav className="flex-1 px-4 space-y-1">
+          {menuItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                  isActive 
+                    ? 'bg-blue-50 text-blue-600' 
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
               >
-                <Menu size={20} />
-              </button>
+                <item.icon size={20} />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* User Profile & Logout */}
+        <div className="p-4 border-t border-gray-200">
+          <div className="flex items-center gap-3 mb-4 px-2">
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+              <UserIcon size={20} />
             </div>
-          )}
-        </div>
-
-        {/* Menu principal */}
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          <nav className="flex flex-col gap-1">
-            {navItems.map(({ label, icon: Icon, to }) => {
-              const active = isActive(to);
-              return (
-                <Link
-                  key={label}
-                  to={to}
-                  className={`flex items-center px-3 py-2.5 rounded-md text-sm transition-all ${
-                    active
-                      ? "bg-blue-50 text-blue-700 font-medium"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  } ${collapsed ? "justify-center" : "gap-3"}`}
-                >
-                  <Icon
-                    size={18}
-                    className={active ? "text-blue-600" : "text-gray-500"}
-                  />
-                  {!collapsed && <span className="truncate">{label}</span>}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-
-        <div className="px-4 py-4 border-t border-gray-200">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-900 truncate">
+                {user?.displayName || 'Psicólogo'}
+              </p>
+              <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+            </div>
+          </div>
           <button
             onClick={handleLogout}
-            className={`flex cursor-pointer items-center px-3 py-2.5 rounded-md text-sm transition-all w-full text-gray-600 hover:bg-gray-50 hover:text-gray-900 ${
-              collapsed ? "justify-center" : "gap-3"
-            }`}
+            className="w-full flex items-center gap-3 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
           >
-            <LogOut size={18} className="text-gray-500" />
-            {!collapsed && "Sair"}
+            <LogOut size={18} />
+            Sair
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 bg-gray-50 p-8 overflow-y-auto">{children}</main>
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto p-8">
+        <div className="max-w-6xl mx-auto">
+          {children}
+        </div>
+      </main>
     </div>
   );
 }

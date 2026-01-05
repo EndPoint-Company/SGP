@@ -1,3 +1,5 @@
+// src/features/appointments/components/AppointmentCard.tsx
+
 import React, { useState } from 'react';
 import type { ConsultaStatus } from '../../../features/appointments/types';
 import ConfirmationModal from '../../../components/ui/confirmartion/ConfirmationModal'; // Verifique o caminho

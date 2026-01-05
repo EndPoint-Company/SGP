@@ -21,6 +21,14 @@ interface TimeSelectionPanelProps {
   initialAvailability?: Record<string, string[]>;
 }
 
+// ✅ NOVA FUNÇÃO AUXILIAR
+const formatDateToYYYYMMDD = (date: Date) => {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export function TimeSelectionPanel({
   selectedDays,
   onClose,
@@ -34,12 +42,14 @@ export function TimeSelectionPanel({
     const isEditMode = selectedDays.length === 1 && initialAvailability;
 
     if (isEditMode) {
-      const dayToEditString = selectedDays[0].toISOString().split("T")[0];
+      // ✅ CORREÇÃO APLICADA AQUI
+      const dayToEditString = formatDateToYYYYMMDD(selectedDays[0]);
       const existingTimes = initialAvailability[dayToEditString] || [];
       initialState[dayToEditString] = new Set(existingTimes);
     } else {
       selectedDays.forEach((day) => {
-        const dateString = day.toISOString().split("T")[0];
+        // ✅ CORREÇÃO APLICADA AQUI
+        const dateString = formatDateToYYYYMMDD(day);
         initialState[dateString] = new Set(availableHours);
       });
     }
@@ -48,8 +58,9 @@ export function TimeSelectionPanel({
   });
 
   const [activeDay, setActiveDay] = React.useState<string | "all">(() => {
+    // ✅ CORREÇÃO APLICADA AQUI
     return selectedDays.length === 1
-      ? selectedDays[0].toISOString().split("T")[0]
+      ? formatDateToYYYYMMDD(selectedDays[0])
       : "all";
   });
 
@@ -78,7 +89,6 @@ export function TimeSelectionPanel({
         }
       });
     } else {
-      // Modifica apenas para o dia ativo
       if (newTimes[activeDay]?.has(time)) {
         newTimes[activeDay].delete(time);
       } else {
@@ -135,9 +145,10 @@ export function TimeSelectionPanel({
                 >
                   Todos os dias
                 </button>
-              )}{" "}
+              )}
               {selectedDays.map((day) => {
-                const dateString = day.toISOString().split("T")[0];
+                // ✅ CORREÇÃO APLICADA AQUI
+                const dateString = formatDateToYYYYMMDD(day);
                 return (
                   <button
                     key={dateString}
@@ -148,20 +159,19 @@ export function TimeSelectionPanel({
                         : "bg-white hover:bg-gray-50"
                     }`}
                   >
-                    {formatDate(day)}{" "}
+                    {formatDate(day)}
                   </button>
                 );
-              })}{" "}
-            </div>{" "}
-          </div>{" "}
+              })}
+            </div>
+          </div>
           <p className="text-sm text-gray-500 mb-4">
             Clique para{" "}
             {activeDay === "all"
               ? "adicionar ou remover um horário de todos os dias selecionados."
-              : "desmarcar um horário."}{" "}
-          </p>{" "}
+              : "desmarcar um horário."}
+          </p>
           <div className="grid grid-cols-4 gap-3">
-            {" "}
             {availableHours.map((time) => {
               const dateKey =
                 activeDay === "all" ? Object.keys(selectedTimes)[0] : activeDay;
