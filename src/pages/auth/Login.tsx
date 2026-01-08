@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import AuthLayout from "../../layouts/AuthLayout";
+import { AuthLayout }  from "../../layouts/AuthLayout";
 import { LoginForm } from "../../features/auth/components/LoginForm";
 import { useLoginForm } from "../../features/auth/hooks/useLoginForm";
 
@@ -10,6 +10,8 @@ export default function Login() {
   return (
     <AuthLayout
       title="Entrar na sua conta"
+      imageUrl="/login-illustration.svg" // Exemplo de path
+      imageAlt="Pessoas colaborando"
       subtitle={
         <>
           Ou{" "}

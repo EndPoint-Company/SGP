@@ -18,20 +18,10 @@ function ImageColumn({ imageUrl, imageAlt }: ImageColumnProps) {
   );
 }
 
-type FormColumnProps = {
-  children: React.ReactNode;
-};
-
-function FormColumn({ children }: FormColumnProps) {
-  return (
-    <div className="w-full lg:w-2/5 p-12 flex flex-col justify-center">
-      {children}
-    </div>
-  );
-}
-
 type AuthLayoutProps = {
   children: React.ReactNode;
+  title: string;
+  subtitle: React.ReactNode;
   imageUrl: string;
   imageAlt: string;
   imagePosition?: 'left' | 'right';
@@ -39,6 +29,8 @@ type AuthLayoutProps = {
 
 export function AuthLayout({
   children,
+  title,
+  subtitle,
   imageUrl,
   imageAlt,
   imagePosition = 'left',
@@ -46,18 +38,20 @@ export function AuthLayout({
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="flex w-full max-w-6xl overflow-hidden gap-x-20">
-        {imagePosition === 'left' ? (
-          <>
-            <ImageColumn imageUrl={imageUrl} imageAlt={imageAlt} />
-            <FormColumn>{children}</FormColumn>
-          </>
-        ) : (
-          <>
-            <FormColumn>{children}</FormColumn>
-            <ImageColumn imageUrl={imageUrl} imageAlt={imageAlt} />
-          </>
-        )}
+        {imagePosition === 'left' && <ImageColumn imageUrl={imageUrl} imageAlt={imageAlt} />}
+        
+        <div className="w-full lg:w-2/5 p-12 flex flex-col justify-center">
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-gray-900">{title}</h2>
+            <div className="mt-2 text-sm text-gray-600">{subtitle}</div>
+          </div>
+          {children}
+        </div>
+
+        {imagePosition === 'right' && <ImageColumn imageUrl={imageUrl} imageAlt={imageAlt} />}
       </div>
     </div>
   );
 }
+
+export default AuthLayout; // Adicionado export default para as páginas

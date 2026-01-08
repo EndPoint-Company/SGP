@@ -8,22 +8,21 @@ export function useRegisterForm() {
   const [isLoading, setIsLoading] = useState(false);
 
   /**
-   * Corrigido: Adicionado underscore (_) ao 'data' para indicar variável 
-   * intencionalmente não utilizada no momento (placeholder para integração).
-   * Isso resolve o erro 'no-unused-vars' do ESLint.
+   * handleRegister agora ignora explicitamente o aviso de variável não utilizada
+   * apenas para este parâmetro específico, até que a integração com o serviço seja reativada.
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleRegister = async (_data: RegisterFormData) => {
     setIsLoading(true);
     setError(null);
+    
     try {
-      // Aqui integraria com o seu serviço de registo (Firebase + Backend)
-      // await authService.register(_data); 
+      // Simulação de delay de rede para testar o estado de isLoading na UI
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // O redirecionamento ocorre após o "sucesso" da operação placeholder
       navigate('/login');
     } catch (err) { 
-      /**
-       * Corrigido: Removido ': any' para evitar o erro de 'explicit-any'.
-       * Tratamos o erro de forma segura verificando se é uma instância de Error.
-       */
       const errorMessage = err instanceof Error ? err.message : "Erro ao criar conta.";
       setError(errorMessage);
     } finally {

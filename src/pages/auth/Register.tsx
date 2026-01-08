@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import AuthLayout from "../../layouts/AuthLayout";
+import { AuthLayout }  from "../../layouts/AuthLayout";
 import { RegisterForm } from "../../features/auth/components/RegisterForm";
 import { useRegisterForm } from "../../features/auth/hooks/useRegisterForm";
 
@@ -10,6 +10,9 @@ export default function Register() {
   return (
     <AuthLayout
       title="Criar nova conta"
+      imageUrl="/register-illustration.svg"
+      imageAlt="Cadastro de usuário"
+      imagePosition="right" // Opcional: inverte a imagem no registro
       subtitle={
         <>
           Já possui uma conta?{" "}
