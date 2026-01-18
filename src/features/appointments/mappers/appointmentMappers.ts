@@ -1,18 +1,50 @@
-
 import type { Consulta } from "../types";
 
-/**
- * ATUALIZADO: Como a API já retorna os dados no formato esperado (camelCase, 
- * correspondendo à interface `Consulta`), uma função de mapeamento complexa 
- * não é mais necessária.
- *
- * Se em algum momento a API e o modelo do frontend divergirem, a lógica de 
- * mapeamento pode ser adicionada aqui. Por enquanto, esta função apenas 
- * garante a consistência do fluxo de dados.
- */
-export function mapApiDataToConsulta(apiData: Consulta): Consulta {
-  // Nenhuma conversão de nome de campo (snake_case para camelCase) é necessária.
-  // Os dados da API já correspondem à interface `Consulta`.
-  // Apenas retornamos os dados para manter a estrutura do código.
-  return apiData;
+// Interface que define a "forma" esperada dos dados brutos vindos da API.
+// Usamos 'unknown' ou tipos opcionais para campos que podem variar ou não existir.
+interface ConsultaDTO {
+  inicio?: string;
+  fim?: string;
+  dataAgendamento?: string;
+  status?: string;
+  [key: string]: unknown; // Permite outras propriedades que virão via spread operator
 }
+
+/**
+ * Normaliza datas vindas da API para o formato ISO string seguro para o Frontend.
+ * Segue o princípio de robustez: "Seja liberal no que aceita e conservador no que envia".
+ */
+export const toDomain = (consulta: unknown): Consulta => {
+  // Fazemos o cast do 'unknown' para nosso DTO para poder acessar as propriedades com segurança
+  const dto = consulta as ConsultaDTO;
+
+  const safeFormat = (dateString: unknown): string => {
+    if (typeof dateString !== 'string' || !dateString) return "";
+    
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      console.warn(`[Mapper] Data inválida recebida: "${dateString}"`);
+      return String(dateString); // Retorna original em caso de erro
+    }
+    return date.toISOString();
+  };
+
+  return {
+    // Espalhamos as propriedades originais. O cast duplo (as unknown as Consulta) 
+    // é usado aqui para garantir que propriedades extras compatíveis sejam passadas,
+    // mas os campos que sobrescrevemos abaixo terão prioridade.
+    ...(dto as unknown as Consulta),
+    
+    inicio: safeFormat(dto.inicio),
+    fim: safeFormat(dto.fim),
+    dataAgendamento: safeFormat(dto.dataAgendamento),
+    
+    // Garante que o status seja tipado corretamente, prevenindo erros se vier null/undefined
+    status: (dto.status as Consulta['status']) 
+  };
+};
+
+/**
+ * Se precisarmos enviar dados para a API em um formato específico no futuro,
+ * criaríamos um método `toDTO` aqui.
+ */
