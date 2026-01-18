@@ -23,19 +23,16 @@ export default function Login() {
     console.log("Iniciando login...");
 
     try {
-      // Chama o login do Contexto. Ele já atualiza user e role internamente.
       await login(data.email, data.password);
       
       console.log("Login bem-sucedido no contexto.");
 
-      // Navega para a rota intermediária que decide para onde ir baseada no Role
       navigate("/after-login", { replace: true });
       
     } catch (error: unknown) {
       console.error("Erro ao fazer login:", error);
       let errorMessage = "Erro ao fazer login";
       
-      // Tratamento de erro simplificado
       if (typeof error === 'object' && error !== null && 'code' in error) {
         const firebaseError = error as { code: string };
         switch (firebaseError.code) {
@@ -44,7 +41,7 @@ export default function Login() {
             break;
           case "auth/user-not-found":
           case "auth/wrong-password":
-          case "auth/invalid-credential": // Código comum mais recente
+          case "auth/invalid-credential":
             errorMessage = "Email ou senha incorretos";
             break;
           case "auth/too-many-requests":
