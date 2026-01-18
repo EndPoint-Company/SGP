@@ -6,9 +6,8 @@ import {
   signOut 
 } from 'firebase/auth';
 import { auth } from '../../../services/firebase';
-import { AuthContext } from '../contexts/AuthContextDefinition';
-import type { AuthContextType, UserRole } from '../contexts/AuthContextDefinition';
-// Importamos o serviço em vez de acessar o banco diretamente
+import { AuthContext } from './AuthContextDefinition';
+import type { AuthContextType, UserRole } from './AuthContextDefinition';
 import { userService } from '../../../services/userService';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -16,7 +15,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // A lógica complexa foi movida para o Service
+  // Agora delegamos para o serviço centralizado
   const checkUserRole = async (uid: string): Promise<UserRole> => {
     return await userService.getUserRole(uid);
   };
@@ -25,13 +24,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const firebaseUser = userCredential.user;
+      const user = userCredential.user;
       
-      // Chama o serviço para descobrir o papel
-      const userRole = await checkUserRole(firebaseUser.uid);
+      // Busca a role IMEDIATAMENTE após o login
+      const userRole = await checkUserRole(user.uid);
       
-      setUser(firebaseUser);
+      setUser(user);
       setRole(userRole);
+      
+      // Se não achar role, significa que o usuário não está nas tabelas Alunos/Psicologos
+      if (!userRole) {
+        console.warn("Usuário logado mas sem perfil de Aluno ou Psicólogo encontrado.");
+      }
     } catch (error) {
       console.error('Erro no login:', error);
       throw error;
@@ -57,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        // Ao recarregar a página, verifica a role novamente
         const userRole = await checkUserRole(firebaseUser.uid);
         setUser(firebaseUser);
         setRole(userRole);
