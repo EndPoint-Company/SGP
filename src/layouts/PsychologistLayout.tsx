@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Home,
@@ -6,7 +6,10 @@ import {
   Calendar,
   Menu,
   LogOut,
+  User as UserIcon
 } from "lucide-react";
+import { useAuth } from "../features/auth/hooks/useAuth";
+import { useUserData } from "../contexts/UserDataProvider";
 
 export default function PsychologistLayout({
   children,
@@ -14,23 +17,27 @@ export default function PsychologistLayout({
   children: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
-
   const location = useLocation();
   const navigate = useNavigate();
 
+  // 1. Dados Reais
+  const { user, logout } = useAuth();
+  const { findPsicologoById } = useUserData();
+
+  const psychProfile = user ? findPsicologoById(user.uid) : null;
+  const displayName = psychProfile?.nome || user?.displayName || "Psicólogo";
+  const avatarUrl = psychProfile?.avatarUrl;
+
   const navItems = [
     { label: "Início", icon: Home, to: "/psychologist/home" },
-    {
-      label: "Atendimentos",
-      icon: LayoutDashboard,
-      to: "/psychologist/appointments",
-    },
+    { label: "Atendimentos", icon: LayoutDashboard, to: "/psychologist/appointments" },
     { label: "Agenda", icon: Calendar, to: "/psychologist/schedule" },
   ];
 
   const isActive = (path: string) => location.pathname === path;
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logout();
     navigate("/login");
   };
 
@@ -53,23 +60,29 @@ export default function PsychologistLayout({
                 </button>
               </div>
               <div className="flex justify-center mt-2">
-                <img
-                  src="https://i.pravatar.cc/40"
-                  alt="Avatar"
-                  className="w-9 h-9 rounded-full"
-                />
+                 {avatarUrl ? (
+                  <img src={avatarUrl} alt="Avatar" className="w-9 h-9 rounded-full object-cover" />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                    <UserIcon size={20} />
+                  </div>
+                )}
               </div>
             </>
           ) : (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <img
-                  src="https://i.pravatar.cc/40"
-                  alt="Avatar"
-                  className="w-9 h-9 rounded-full"
-                />
-                <div className="leading-tight">
-                  <h2 className="font-semibold text-sm">Ester Ravette</h2>
+                 {avatarUrl ? (
+                  <img src={avatarUrl} alt="Avatar" className="w-9 h-9 rounded-full object-cover" />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                    <UserIcon size={20} />
+                  </div>
+                )}
+                <div className="leading-tight overflow-hidden">
+                  <h2 className="font-semibold text-sm truncate max-w-[120px]" title={displayName}>
+                    {displayName}
+                  </h2>
                   <p className="text-xs text-gray-500">Psicólogo(a)</p>
                 </div>
               </div>
@@ -83,7 +96,6 @@ export default function PsychologistLayout({
           )}
         </div>
 
-        {/* Menu principal */}
         <div className="flex-1 overflow-y-auto px-4 py-4">
           <nav className="flex flex-col gap-1">
             {navItems.map(({ label, icon: Icon, to }) => {

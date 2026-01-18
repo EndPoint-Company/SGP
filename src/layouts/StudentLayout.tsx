@@ -6,12 +6,24 @@ import {
   Calendar,
   Menu,
   LogOut,
+  User as UserIcon
 } from "lucide-react";
+import { useAuth } from "../features/auth/hooks/useAuth";
+import { useUserData } from "../contexts/UserDataProvider";
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // 1. Hook de Autenticação e Dados
+  const { user, logout } = useAuth();
+  const { findAlunoById } = useUserData();
+
+  // 2. Busca dados reais do perfil
+  const studentProfile = user ? findAlunoById(user.uid) : null;
+  const displayName = studentProfile?.nome || user?.displayName || "Aluno";
+  const avatarUrl = studentProfile?.avatarUrl;
 
   const navItems = [
     { label: "Início", icon: Home, to: "/student/home" },
@@ -21,7 +33,8 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
 
   const isActive = (path: string) => location.pathname === path;
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logout();
     navigate("/login");
   };
 
@@ -32,7 +45,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
           collapsed ? "w-20" : "w-64"
         }`}
       >
-        {/* Topo e Menu Principal (sem alterações) */}
         <div className="px-4 pt-4 pb-2 flex flex-col gap-3">
           {collapsed ? (
             <>
@@ -45,23 +57,31 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
                 </button>
               </div>
               <div className="flex justify-center mt-2">
-                <img
-                  src="https://i.pravatar.cc/40?u=marcos"
-                  alt="Avatar"
-                  className="w-9 h-9 rounded-full"
-                />
+                {/* Avatar Dinâmico (Colapsado) */}
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Avatar" className="w-9 h-9 rounded-full object-cover" />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                    <UserIcon size={20} />
+                  </div>
+                )}
               </div>
             </>
           ) : (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <img
-                  src="https://i.pravatar.cc/40?u=marcos"
-                  alt="Avatar"
-                  className="w-9 h-9 rounded-full"
-                />
-                <div className="leading-tight">
-                  <h2 className="font-semibold text-sm">Você</h2>
+                {/* Avatar Dinâmico (Expandido) */}
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Avatar" className="w-9 h-9 rounded-full object-cover" />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                    <UserIcon size={20} />
+                  </div>
+                )}
+                <div className="leading-tight overflow-hidden">
+                  <h2 className="font-semibold text-sm truncate max-w-[120px]" title={displayName}>
+                    {displayName}
+                  </h2>
                   <p className="text-xs text-gray-500">Paciente</p>
                 </div>
               </div>
@@ -74,6 +94,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
             </div>
           )}
         </div>
+
         <div className="flex-1 overflow-y-auto px-4 py-4">
           <nav className="flex flex-col gap-1">
             {navItems.map(({ label, icon: Icon, to }) => {
@@ -99,7 +120,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
           </nav>
         </div>
 
-        {/* ATUALIZADO: Seção inferior simplificada com apenas o botão Sair */}
         <div className="px-4 py-4 border-t border-gray-200">
           <button
             onClick={handleLogout}

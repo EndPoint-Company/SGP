@@ -1,7 +1,7 @@
 import React from "react";
 import { useAuth } from "../../features/auth/hooks/useAuth";
 import { useUserData } from "../../contexts/UserDataProvider";
-import { usePsychologistHome } from "../../features/psychologist/hooks/usePsychologistHome"; // Novo Hook
+import { usePsychologistHome } from "../../features/psychologist/hooks/usePsychologistHome";
 
 import PsychologistLayout from "../../layouts/PsychologistLayout";
 import { WelcomeBanner } from "../../features/home/components/WelcomeBanner";
@@ -9,7 +9,7 @@ import { AppointmentsSection } from "../../features/home/components/Appointments
 
 export default function PsychologistHome() {
   const { user, isLoading: isAuthLoading } = useAuth();
-  const { isLoading: isUserDataLoading } = useUserData();
+  const { isLoading: isUserDataLoading, findPsicologoById } = useUserData();
   
   const { 
     upcomingAppointments, 
@@ -18,6 +18,9 @@ export default function PsychologistHome() {
     error, 
     updateStatus 
   } = usePsychologistHome(user?.uid);
+
+  const psychProfile = user ? findPsicologoById(user.uid) : null;
+  const displayName = psychProfile?.nome || user?.displayName || "Psicólogo";
 
   const isLoading = isAuthLoading || isUserDataLoading || isHomeLoading;
 
@@ -44,7 +47,7 @@ export default function PsychologistHome() {
 
   return (
     <PsychologistLayout>
-      <WelcomeBanner userName={user?.displayName || user?.email || "Psicólogo"} />
+      <WelcomeBanner userName={displayName} />
       
       <div className="space-y-8">
         <AppointmentsSection

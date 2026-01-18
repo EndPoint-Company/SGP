@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from "../../features/auth/hooks/useAuth";
 import { useUserData } from "../../contexts/UserDataProvider";
-import { useStudentHome } from "../../features/student/hooks/useStudentHome"; // Novo Hook
+import { useStudentHome } from "../../features/student/hooks/useStudentHome";
 
 import StudentLayout from "../../layouts/StudentLayout";
 import { WelcomeBanner } from "../../features/home/components/WelcomeBanner";
@@ -14,9 +14,9 @@ import type { NewConsulta } from "../../features/appointments/types";
 
 export default function StudentHome() {
   const { user, isLoading: isAuthLoading } = useAuth();
-  const { isLoading: isUserDataLoading } = useUserData();
   
-  // Toda a lógica complexa delegada ao Hook
+  const { isLoading: isUserDataLoading, findAlunoById } = useUserData();
+  
   const { 
     upcomingAppointments, 
     pendingRequests, 
@@ -29,7 +29,9 @@ export default function StudentHome() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Wrapper simples para conectar a UI ao Hook
+  const studentProfile = user ? findAlunoById(user.uid) : null;
+  const displayName = studentProfile?.nome || user?.displayName || "Aluno";
+
   const onConfirmRequest = async (data: NewConsulta) => {
     const success = await createRequest(data);
     if (success) setIsModalOpen(false);
@@ -47,9 +49,8 @@ export default function StudentHome() {
 
   return (
     <StudentLayout>
-      <WelcomeBanner userName={user?.displayName || user?.email || "Aluno"} />
+      <WelcomeBanner userName={displayName} />
 
-      {/* Modal de Nova Solicitação */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         {targetPsicologo && user?.uid && (
           <AppointmentRequestFlow
