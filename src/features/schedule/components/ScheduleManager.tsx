@@ -1,20 +1,16 @@
-// src/features/schedule/components/ScheduleManager.tsx
-
-import React, { useState, useMemo } from "react";
+import React, { useMemo } from "react";
 import { ContinuousCalendar } from "../../../components/ui/calender/ContinuousCalendar";
 import { TimeSelectionPanel } from "../../../components/ui/calender/TimeSelectionPanel";
 import { DayDetailPanel } from "../../../components/ui/calender/DayDetailPanel";
 import { CalendarCheck, X, Check, ArrowRightLeft } from "lucide-react";
 import type { Consulta, ConsultaStatus } from "../../appointments/types";
+import { useScheduleFlow } from "../hooks/useScheduleFlow";
 
 type ProcessedConsulta = Consulta & {
   participantName: string;
 };
-
-// Este tipo agora corresponde ao que o DayDetailPanel espera.
 type ChildComponentStatus = 'aguardando aprovacao' | 'confirmada' | 'cancelada' | 'passada';
 
-// ATUALIZADO: As props foram ajustadas para uma melhor comunicação com o componente pai.
 interface ScheduleManagerProps {
   userRole: "aluno" | "psicologo";
   currentUserId: string;
@@ -34,121 +30,44 @@ export default function ScheduleManager({
   onBlockDay,
   onShowToast,
 }: ScheduleManagerProps) {
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [pendingSelectedDays, setPendingSelectedDays] = useState<Date[]>([]);
-  const [isTimePanelOpen, setIsTimePanelOpen] = useState(false);
-  const [selectedDayForDetail, setSelectedDayForDetail] = useState<Date | null>(null);
-  const [selectionType, setSelectionType] = useState<"single" | "interval">("single");
-  const [intervalPhase, setIntervalPhase] = useState<"none" | "selecting-start" | "selecting-end">("none");
-  const [startDate, setStartDate] = useState<Date | null>(null);
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const formatDateKey = (date: Date) => date.toISOString().split("T")[0];
-
-  const handleDayClick = (day: Date) => {
-    if (isSelectionMode) return;
-    const dayKey = formatDateKey(day);
-    const isAvailable = (availability[dayKey] || []).length > 0;
-    const hasEvents = consultas.some(
-      (event) => formatDateKey(new Date(event.inicio)) === dayKey
-    );
-    if (isAvailable || hasEvents) {
-      setSelectedDayForDetail(day);
-    }
-  };
-
-  const handlePendingDaySelect = (day: Date) => {
-    if (day < today) return;
-    const dayKey = formatDateKey(day);
-    if ((availability[dayKey] || []).length > 0) return;
-
-    if (selectionType === "single") {
-      const existingIndex = pendingSelectedDays.findIndex((d) => d.getTime() === day.getTime());
-      if (existingIndex > -1) {
-        setPendingSelectedDays(pendingSelectedDays.filter((_, index) => index !== existingIndex));
-      } else {
-        setPendingSelectedDays([...pendingSelectedDays, day]);
-      }
-    } else if (selectionType === "interval") {
-      if (intervalPhase === "selecting-start") {
-        setStartDate(day);
-        setPendingSelectedDays([day]);
-        setIntervalPhase("selecting-end");
-      } else if (intervalPhase === "selecting-end" && startDate) {
-        const start = startDate.getTime();
-        const end = day.getTime();
-        const newSelectedDays: Date[] = [];
-        const minDate = new Date(Math.min(start, end));
-        const maxDate = new Date(Math.max(start, end));
-
-        for (let d = new Date(minDate); d <= maxDate; d.setDate(d.getDate() + 1)) {
-          const dayOfWeek = d.getDay();
-          const currentDayKey = formatDateKey(d);
-          const isAlreadyAvailable = (availability[currentDayKey] || []).length > 0;
-          if (dayOfWeek !== 0 && dayOfWeek !== 6 && !isAlreadyAvailable) {
-            newSelectedDays.push(new Date(d));
-          }
-        }
-        setPendingSelectedDays(newSelectedDays);
-        setIntervalPhase("none");
-      }
-    }
-  };
-
-  const handleFinalSave = async (newlyAddedAvailability: Record<string, string[]>) => {
-    if (onSaveAvailability) {
-      await onSaveAvailability(newlyAddedAvailability);
-      onShowToast?.("Novos horários disponibilizados!");
-    }
-    setPendingSelectedDays([]);
-    setIsTimePanelOpen(false);
-  };
-
-  const handleBlockDay = async (dayToBlock: Date) => {
-    if (onBlockDay) {
-      await onBlockDay(dayToBlock);
-      onShowToast?.("Dia bloqueado com sucesso!");
-    }
-    setSelectedDayForDetail(null);
-  };
-
-  const handleEditDay = () => {
-    if (!selectedDayForDetail) return;
-    setPendingSelectedDays([selectedDayForDetail]);
-    setSelectedDayForDetail(null);
-    setIsTimePanelOpen(true);
-  };
   
-  const handleCloseTimePanel = () => {
-    setIsTimePanelOpen(false);
-    setPendingSelectedDays([]);
-    setStartDate(null);
-    setIntervalPhase("none");
-  };
+  const {
+    isSelectionMode,
+    isTimePanelOpen,
+    selectedDayForDetail,
+    pendingSelectedDays,
+    selectionType,
+    intervalPhase,
+    previewDays,
+    setIsTimePanelOpen,
+    setSelectedDayForDetail,
+    setSelectionType,
+    setStartDate,
+    setPendingSelectedDays,
+    setIntervalPhase,
+    handleDayClick,
+    handlePendingDaySelect,
+    handleDayHover,
+    handleFinalSave,
+    handleBlockDay,
+    handleEditDay,
+    resetSelection,
+    toggleSelectionMode,
+    closePanels
+  } = useScheduleFlow({ availability, onSaveAvailability, onBlockDay, onShowToast });
 
-  const getInstructionText = () => {
-    if (selectionType === "interval") {
-      if (intervalPhase === "selecting-start") return "Selecione o dia de início";
-      if (intervalPhase === "selecting-end") return "Selecione o dia de fim";
-    }
-    return `${pendingSelectedDays.length} dias selecionados`;
-  };
-
-  const isSidebarOpen = isTimePanelOpen || !!selectedDayForDetail;
+  const formatDateKey = (date: Date) => date.toISOString().split("T")[0];
   const calendarRole = userRole === 'aluno' ? 'aluno' : 'psicologo';
 
-  // CORRIGIDO: Garante que a prop 'horario' seja passada para o ContinuousCalendar.
   const calendarEvents = useMemo(() => {
     return consultas.map(c => ({ 
         ...c,
-        horario: c.inicio, // Mapeia 'inicio' para 'horario'
+        horario: c.inicio,
         pacienteId: c.alunoId, 
         status: c.status,
      }));
   }, [consultas]);
 
-  // CORRIGIDO: Ajusta o mapeamento de status para evitar o erro de tipo.
   const detailPanelEvents = useMemo(() => {
     if (!selectedDayForDetail) return [];
     
@@ -168,75 +87,132 @@ export default function ScheduleManager({
       }));
   }, [consultas, selectedDayForDetail]);
 
-  return (
-    <div className="relative h-full w-full flex flex-row overflow-hidden rounded-2xl">
-      <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
-        <div className="flex-1 min-h-0">
-          <ContinuousCalendar
-            role={calendarRole}
-            events={calendarEvents}
-            availability={availability}
-            isSelectionMode={isSelectionMode}
-            selectedPendingDays={pendingSelectedDays}
-            viewingDay={selectedDayForDetail}
-            onDayClick={handleDayClick}
-            onPendingDaySelect={handlePendingDaySelect}
-            className={isSidebarOpen ? "rounded-tr-none" : "rounded-tr-2xl"}
-            currentUserId={currentUserId}
-          />
-        </div>
+  const getInstructionText = () => {
+    if (selectionType === "interval") {
+      if (intervalPhase === "selecting-start") return "Clique no dia de início";
+      if (intervalPhase === "selecting-end") return "Clique no dia de fim";
+    }
+    return `${pendingSelectedDays.length} dias selecionados`;
+  };
 
-        {userRole === "psicologo" && (
-          <div className={`flex-shrink-0 bg-white p-4 border-t border-gray-200 flex justify-between items-center rounded-bl-2xl ${isSidebarOpen ? "rounded-br-none" : "rounded-br-2xl"}`}>
-            {isSelectionMode ? (
-              <>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-medium text-gray-600">{getInstructionText()}</span>
-                  <button onClick={() => { setSelectionType((prev) => prev === "single" ? "interval" : "single"); setIntervalPhase("selecting-start"); setPendingSelectedDays([]); setStartDate(null); }} className="inline-flex items-center justify-center h-10 px-4 rounded-md bg-white text-gray-800 border border-gray-300 text-sm font-medium hover:bg-gray-50">
-                    <ArrowRightLeft size={14} className="mr-2" />
-                    {selectionType === "single" ? "Selecionar Intervalo" : "Selecionar um a um"}
-                  </button>
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={() => { setIsSelectionMode(false); setPendingSelectedDays([]); setStartDate(null); setIntervalPhase("none"); }} className="inline-flex items-center justify-center h-10 px-4 py-2 rounded-md bg-white text-gray-800 border border-gray-300 text-sm font-medium hover:bg-gray-50">
-                    <X className="w-4 h-4 mr-2" /> Cancelar
-                  </button>
-                  <button onClick={() => { if (pendingSelectedDays.length > 0) setIsTimePanelOpen(true); setIsSelectionMode(false); }} disabled={pendingSelectedDays.length === 0} className="inline-flex items-center justify-center h-10 px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300">
-                    <Check className="w-4 h-4 mr-2" /> Próximo
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="w-full flex justify-end">
-                <button onClick={() => setIsSelectionMode(true)} className="inline-flex items-center justify-center h-10 px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700">
-                  <CalendarCheck className="w-4 h-4 mr-2" /> Disponibilizar Datas
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+  const isModalOpen = isTimePanelOpen || !!selectedDayForDetail;
+
+  return (
+    <div className="relative h-full w-full bg-gray-50 overflow-hidden rounded-2xl border border-gray-200 shadow-sm">
+      
+      {/* 1. CALENDÁRIO */}
+      <div className="w-full h-full">
+        <ContinuousCalendar
+          role={calendarRole}
+          events={calendarEvents}
+          availability={availability}
+          isSelectionMode={isSelectionMode}
+          selectedPendingDays={pendingSelectedDays}
+          previewDays={previewDays} 
+          viewingDay={selectedDayForDetail}
+          onDayClick={handleDayClick}
+          onPendingDaySelect={handlePendingDaySelect}
+          onDayHover={handleDayHover} 
+          className="h-full w-full !rounded-2xl"
+          currentUserId={currentUserId}
+        />
       </div>
 
-      {isTimePanelOpen && (
-        <TimeSelectionPanel
-          selectedDays={pendingSelectedDays}
-          onClose={handleCloseTimePanel}
-          onSave={handleFinalSave}
-          initialAvailability={availability}
+      {/* 2. BARRA DE AÇÕES FLUTUANTE */}
+      {userRole === "psicologo" && !isModalOpen && (
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="bg-white/90 backdrop-blur-sm border border-gray-200 shadow-xl rounded-full px-2 py-2 flex items-center gap-3 transition-all duration-300">
+            
+            {!isSelectionMode ? (
+               <button 
+                 onClick={toggleSelectionMode} 
+                 className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-full font-medium hover:bg-blue-700 transition-colors shadow-md"
+               >
+                 <CalendarCheck className="w-5 h-5" />
+                 <span>Disponibilizar Datas</span>
+               </button>
+            ) : (
+              <>
+                <div className="px-4 text-sm font-semibold text-gray-700 border-r border-gray-300 pr-4">
+                  {getInstructionText()}
+                </div>
+
+                <button 
+                  onClick={() => { 
+                      setSelectionType((prev) => prev === "single" ? "interval" : "single"); 
+                      setIntervalPhase("selecting-start"); 
+                      setPendingSelectedDays([]); 
+                      setStartDate(null); 
+                  }} 
+                  className="p-3 text-gray-600 hover:bg-gray-100 rounded-full tooltip-trigger"
+                  title={selectionType === "single" ? "Mudar para Seleção de Intervalo" : "Mudar para Seleção Única"}
+                >
+                  <ArrowRightLeft size={20} />
+                </button>
+
+                <button 
+                  onClick={resetSelection} 
+                  className="p-3 text-red-600 hover:bg-red-50 rounded-full"
+                  title="Cancelar"
+                >
+                  <X size={20} />
+                </button>
+
+                <button 
+                  onClick={() => { if (pendingSelectedDays.length > 0) setIsTimePanelOpen(true); }} 
+                  disabled={pendingSelectedDays.length === 0} 
+                  className="flex items-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-full font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Check className="w-5 h-5" />
+                  <span>Confirmar</span>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 3. BACKDROP */}
+      {isModalOpen && (
+        <div 
+            className="absolute inset-0 bg-white/30 backdrop-blur-sm z-[60] transition-opacity animate-in fade-in"
+            onClick={closePanels}
         />
       )}
 
-      {selectedDayForDetail && (
-        <DayDetailPanel
-          userRole={userRole}
-          day={selectedDayForDetail}
-          availabilityForDay={availability[formatDateKey(selectedDayForDetail)] || []}
-          eventsForDay={detailPanelEvents}
-          onClose={() => setSelectedDayForDetail(null)}
-          onEdit={handleEditDay}
-          onBlockDay={handleBlockDay}
-        />
+      {/* 4. MODAL DE SELEÇÃO DE HORAS */}
+      {isTimePanelOpen && (
+        <div className="absolute inset-0 z-[70] flex items-center justify-center pointer-events-none p-4">
+          {/* CORREÇÃO: 'w-fit' para ajustar ao tamanho do conteúdo e evitar barra branca */}
+          <div className="w-fit max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden pointer-events-auto animate-in fade-in zoom-in-95 duration-200">
+            <TimeSelectionPanel
+              selectedDays={pendingSelectedDays}
+              onClose={() => setIsTimePanelOpen(false)}
+              onSave={handleFinalSave}
+              initialAvailability={availability}
+            />
+          </div>
+        </div>
       )}
+
+      {/* 5. MODAL DE DETALHES DO DIA */}
+      {selectedDayForDetail && (
+        <div className="absolute inset-0 z-[70] flex items-center justify-center pointer-events-none p-4">
+          {/* CORREÇÃO: 'w-fit' aqui também */}
+          <div className="w-fit max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden pointer-events-auto animate-in fade-in zoom-in-95 duration-200">
+            <DayDetailPanel
+              userRole={userRole}
+              day={selectedDayForDetail}
+              availabilityForDay={availability[formatDateKey(selectedDayForDetail)] || []}
+              eventsForDay={detailPanelEvents}
+              onClose={() => setSelectedDayForDetail(null)}
+              onEdit={handleEditDay}
+              onBlockDay={handleBlockDay}
+            />
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
