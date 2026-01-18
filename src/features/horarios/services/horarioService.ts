@@ -1,7 +1,8 @@
 import apiClient from "../../../services/apiClient";
 import { AxiosError } from "axios";
+import { toDomain } from "../mappers/horarioMappers";
 
-// Definição de Tipos (Idealmente mover para src/features/horarios/types.ts)
+// Mantemos as interfaces aqui ou movemos para um types/index.ts (sugestão futura)
 export interface HorarioDisponivel {
   id: string;
   psicologoId: string;
@@ -18,10 +19,17 @@ export interface NewHorario {
 
 const API_TIMEOUT = 15000;
 
-const handleHorarioError = (error: unknown, defaultMessage: string): never => {
-  // Simplificação: Reutiliza lógica similar ou importa um handler global se houver
-  if (error instanceof AxiosError && error.response?.data?.message) {
-    throw new Error(error.response.data.message);
+// Helper de erro padronizado (idealmente extraído para um utils/apiUtils.ts)
+const handleServiceError = (error: unknown, defaultMessage: string): never => {
+  if (error instanceof AxiosError) {
+    const status = error.response?.status;
+    const msg = error.response?.data?.message || error.message;
+    
+    if (status === 401) throw new Error("Sessão expirada.");
+    if (status === 403) throw new Error("Sem permissão.");
+    if (status === 409) throw new Error("Conflito de horário."); // Específico para horários
+    
+    throw new Error(msg || defaultMessage);
   }
   throw new Error(defaultMessage);
 };
@@ -29,14 +37,16 @@ const handleHorarioError = (error: unknown, defaultMessage: string): never => {
 export const horarioService = {
   async getByPsicologoId(psicologoId: string): Promise<HorarioDisponivel[]> {
     try {
-      const response = await apiClient.get<HorarioDisponivel[]>('/horarios', {
+      const response = await apiClient.get<unknown[]>('/horarios', {
         params: { psicologoId },
         timeout: API_TIMEOUT,
       });
-      // Aqui não temos mapper complexo pois é apenas repasse de dados, mas validamos array
-      return Array.isArray(response.data) ? response.data : [];
+      // Aplica o Mapper
+      return Array.isArray(response.data) ? response.data.map(toDomain) : [];
     } catch (error) {
-      throw handleHorarioError(error, "Não foi possível carregar os horários.");
+      // Retorna array vazio em caso de 404 para não quebrar a tela
+      if (error instanceof AxiosError && error.response?.status === 404) return [];
+      throw handleServiceError(error, "Não foi possível carregar os horários.");
     }
   },
 
@@ -46,7 +56,7 @@ export const horarioService = {
         timeout: API_TIMEOUT
       });
     } catch (error) {
-      throw handleHorarioError(error, "Não foi possível salvar o horário. Verifique se há conflitos.");
+      throw handleServiceError(error, "Não foi possível salvar o horário.");
     }
   },
 
@@ -56,7 +66,7 @@ export const horarioService = {
         timeout: API_TIMEOUT
       });
     } catch (error) {
-      throw handleHorarioError(error, "Não foi possível remover o horário.");
+      throw handleServiceError(error, "Não foi possível remover o horário.");
     }
   }
 };
