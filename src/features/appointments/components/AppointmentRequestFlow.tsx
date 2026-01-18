@@ -1,22 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState } from "react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { ptBR } from "date-fns/locale";
 import { CalendarPlus, CheckCircle, Loader2 } from "lucide-react";
 import type { NewConsulta } from "../types";
-// CORRIGIDO: A importação de tipo agora é separada da importação de valor.
-import { getHorariosByPsicologoId } from "../../horarios/services/horarioService";
-import type { HorarioDisponivel } from "../../horarios/services/horarioService";
-
-// A interface para os horários formatados para a UI.
-interface AvailableSlot {
-  id: string; // Este é o horarioId
-  time: string;
-}
-
-const formatDateKey = (date: Date) => date.toISOString().split("T")[0];
+import { useAppointmentRequest } from "../hooks/useAppointmentRequest"; // Novo Hook
 
 interface AppointmentRequestFlowProps {
   onConfirm: (data: NewConsulta) => Promise<void>;
@@ -32,89 +22,24 @@ export function AppointmentRequestFlow({
   alunoId,
   psicologoId,
 }: AppointmentRequestFlowProps) {
-  const [step, setStep] = useState<"selection" | "success">("selection");
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
-  const [availableTimes, setAvailableTimes] = useState<AvailableSlot[]>([]);
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<AvailableSlot | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Estado local apenas para o calendário visual
   const [month, setMonth] = useState<Date>(new Date());
 
-  // ATUALIZADO: Estados para gerenciar o carregamento e erros dos horários.
-  const [allSlots, setAllSlots] = useState<HorarioDisponivel[]>([]);
-  const [isLoadingSlots, setIsLoadingSlots] = useState(true);
-  const [slotsError, setSlotsError] = useState<string | null>(null);
-
-  // ATUALIZADO: Efeito para buscar os horários da API quando o componente é montado.
-  useEffect(() => {
-    async function fetchSlots() {
-      if (!psicologoId) return;
-      setIsLoadingSlots(true);
-      setSlotsError(null);
-      try {
-        const slots = await getHorariosByPsicologoId(psicologoId);
-        setAllSlots(slots);
-      } catch (error) {
-        console.error("Erro ao confirmar agendamento:", error);
-        setSlotsError("Não foi possível carregar os horários. Tente novamente mais tarde.");
-      } finally {
-        setIsLoadingSlots(false);
-      }
-    }
-    fetchSlots();
-  }, [psicologoId]);
-
-  const handleDaySelect = (date: Date | undefined) => {
-    if (!date) return;
-    setSelectedDate(date);
-    setMonth(date);
-    setSelectedTimeSlot(null);
-
-    // ATUALIZADO: Filtra os horários da API para o dia selecionado.
-    const dayKey = formatDateKey(date);
-    const timesForDay = allSlots
-      .filter(slot => slot.inicio.startsWith(dayKey) && slot.status === 'disponivel')
-      .map(slot => ({
-        id: slot.id,
-        time: new Date(slot.inicio).toLocaleTimeString('pt-BR', {
-          hour: '2-digit',
-          minute: '2-digit',
-          timeZone: 'America/Sao_Paulo'
-        })
-      }))
-      .sort((a, b) => a.time.localeCompare(b.time)); // Ordena os horários.
-    
-    setAvailableTimes(timesForDay);
-  };
-
-  const handleSubmit = async () => {
-    if (selectedDate && selectedTimeSlot) {
-      setIsSubmitting(true);
-      try {
-        await onConfirm({
-          alunoId: alunoId,
-          psicologoId: psicologoId,
-          horarioId: selectedTimeSlot.id,
-          status: 'aguardando aprovacao'
-        });
-        setStep("success");
-      } catch (error) {
-        console.error("Erro ao confirmar agendamento:", error);
-      } finally {
-        setIsSubmitting(false);
-      }
-    }
-  };
-
-  // ATUALIZADO: Gera um conjunto de dias com horários disponíveis para o DayPicker.
-  const availableDaysSet = useMemo(() => {
-    const daySet = new Set<string>();
-    allSlots.forEach(slot => {
-      if (slot.status === 'disponivel') {
-        daySet.add(formatDateKey(new Date(slot.inicio)));
-      }
-    });
-    return daySet;
-  }, [allSlots]);
+  // Lógica complexa delegada ao Hook
+  const {
+    step,
+    selectedDate,
+    availableTimes,
+    selectedTimeSlot,
+    setSelectedTimeSlot,
+    isSubmitting,
+    isLoadingSlots,
+    slotsError,
+    availableDaysSet,
+    handleDaySelect,
+    handleSubmit,
+    formatDateKey
+  } = useAppointmentRequest(psicologoId, alunoId, onConfirm);
 
   const dayPickerStyles = `
     .rdp-button:hover:not([disabled]):not(.rdp-day_selected) { background-color: #eff6ff; }
