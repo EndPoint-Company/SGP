@@ -1,28 +1,47 @@
-// src/services/userService.ts
 import apiClient from "./apiClient";
+import { toAlunoDomain, toPsicologoDomain } from "./mappers/userMappers";
 
+// Definição ÚNICA dos tipos (Single Source of Truth)
 export interface Aluno {
   id: string;
   nome: string;
+  email?: string;
   avatarUrl?: string;
 }
 
 export interface Psicologo {
   id: string;
   nome: string;
+  email?: string;
   avatarUrl?: string;
+  crp?: string;
 }
 
-// Esta função ainda pode ser útil em outros contextos
-export const getPsicologos = async (): Promise<Psicologo[]> => {
-  try {
-    const response = await apiClient.get<Psicologo[]>('/psicologos');
-    return response.data;
-  } catch (error) {
-    console.error("Erro ao buscar a lista de psicólogos:", error);
-    throw new Error("Não foi possível carregar os psicólogos disponíveis.");
+const API_TIMEOUT = 10000;
+
+export const userService = {
+  async getAlunos(): Promise<Aluno[]> {
+    try {
+      const response = await apiClient.get<unknown[]>('/alunos', { timeout: API_TIMEOUT });
+      return Array.isArray(response.data) ? response.data.map(toAlunoDomain) : [];
+    } catch (error) {
+      console.error("Erro ao buscar alunos:", error);
+      // Retorna array vazio em caso de erro para não quebrar o Contexto
+      return [];
+    }
+  },
+
+  async getPsicologos(): Promise<Psicologo[]> {
+    try {
+      const response = await apiClient.get<unknown[]>('/psicologos', { timeout: API_TIMEOUT });
+      return Array.isArray(response.data) ? response.data.map(toPsicologoDomain) : [];
+    } catch (error) {
+      console.error("Erro ao buscar psicólogos:", error);
+      return [];
+    }
   }
 };
 
-// As funções getPacienteData e getPsicologoData foram removidas 
-// pois sua funcionalidade foi substituída pelo UserDataProvider.
+// Exports para compatibilidade
+export const getAlunos = userService.getAlunos;
+export const getPsicologos = userService.getPsicologos;
