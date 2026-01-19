@@ -1,6 +1,6 @@
 import apiClient from "../../../services/apiClient";
 import type { Consulta, NewConsulta, ConsultaStatus } from "../types";
-import { toDomain } from "../mappers/appointmentMappers"; // Importa o Mapper centralizado
+import { toDomain } from "../mappers/appointmentMappers";
 import { AxiosError } from "axios";
 
 interface ApiErrorResponse {
@@ -11,6 +11,8 @@ interface ApiErrorResponse {
 const API_TIMEOUT = 10000;
 
 export const appointmentService = {
+  // ... getByPsicologoId e getByAlunoId mantidos iguais ...
+
   async getByPsicologoId(psicologoId: string): Promise<Consulta[]> {
     try {
       const response = await apiClient.get<Consulta[]>('/consultas/psicologo', { 
@@ -18,12 +20,10 @@ export const appointmentService = {
         timeout: API_TIMEOUT 
       });
       
-      // Usa toDomain em vez de normalizeConsultaDates
       if (Array.isArray(response.data)) {
         return response.data.map(toDomain);
       }
       return [];
-
     } catch (error) {
       if (appointmentService.isAxiosError(error) && error.response?.status === 404) {
         return [];
@@ -43,7 +43,6 @@ export const appointmentService = {
         return response.data.map(toDomain);
       }
       return [];
-
     } catch (error) {
       if (appointmentService.isAxiosError(error) && error.response?.status === 404) {
         return [];
@@ -54,16 +53,18 @@ export const appointmentService = {
 
   async create(consultaData: NewConsulta): Promise<Consulta> {
     try {
-      // Removemos validateConsultaData (deve ser feito no form/schema)
       const response = await apiClient.post<Consulta>("/consultas", consultaData, { 
         timeout: API_TIMEOUT 
       });
       return toDomain(response.data);
     } catch (error) {
+      // O tratamento específico agora é feito no handleError
       throw appointmentService.handleError(error, "Erro ao criar a consulta.");
     }
   },
 
+  // ... updateStatus e cancel mantidos iguais ...
+  
   async updateStatus(id: string, status: Extract<ConsultaStatus, "confirmada" | "cancelada">): Promise<Consulta> {
     try {
       const response = await apiClient.patch<Consulta>(`/consultas/${id}/status`, { status }, { 
@@ -95,6 +96,7 @@ export const appointmentService = {
     }
   },
   
+  // --- Refatoração Principal: Tratamento de Erros HTTP ---
   handleError(error: unknown, defaultMessage: string): Error {
     if (appointmentService.isAxiosError(error)) {
       const errorData = error.response?.data as ApiErrorResponse;
@@ -106,6 +108,10 @@ export const appointmentService = {
         case 401: return new Error("Sessão expirada. Faça login novamente.");
         case 403: return new Error("Você não tem permissão para realizar esta ação.");
         case 404: return new Error("Recurso não encontrado.");
+        
+        // [!code ++] NOVO: Tratamento explícito de Conflito (Double Booking)
+        case 409: return new Error("Este horário acabou de ser reservado por outro aluno. Por favor, escolha outro.");
+        
         case 500: return new Error("Erro interno no servidor.");
         default: return new Error(errorMessage || defaultMessage);
       }
