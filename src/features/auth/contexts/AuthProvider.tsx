@@ -6,43 +6,36 @@ import {
   signOut 
 } from 'firebase/auth';
 import { auth } from '../../../services/firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../../services/firebase';
-import { AuthContext } from '../contexts/AuthContextDefinition';
-import type { AuthContextType, UserRole } from '../contexts/AuthContextDefinition';
+import { AuthContext } from './AuthContextDefinition';
+import type { AuthContextType, UserRole } from './AuthContextDefinition';
+import { userService } from '../../../services/userService';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthContextType['user']>(null);
   const [role, setRole] = useState<UserRole>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Agora delegamos para o serviço centralizado
   const checkUserRole = async (uid: string): Promise<UserRole> => {
-  try {
-    const psicologoRef = doc(db, 'Psicologos', uid);
-    const psicologoSnap = await getDoc(psicologoRef);
-    if (psicologoSnap.exists()) return 'psychologist';
-
-    const alunoRef = doc(db, 'Alunos', uid);
-    const alunoSnap = await getDoc(alunoRef);
-    if (alunoSnap.exists()) return 'student';
-
-    return null;
-  } catch (error) {
-    console.error('Erro ao verificar role do usuário:', error);
-    return null;
-  }
-};
-
+    return await userService.getUserRole(uid);
+  };
 
   const login = async (email: string, password: string): Promise<void> => {
     setIsLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      
+      // Busca a role IMEDIATAMENTE após o login
       const userRole = await checkUserRole(user.uid);
       
       setUser(user);
       setRole(userRole);
+      
+      // Se não achar role, significa que o usuário não está nas tabelas Alunos/Psicologos
+      if (!userRole) {
+        console.warn("Usuário logado mas sem perfil de Aluno ou Psicólogo encontrado.");
+      }
     } catch (error) {
       console.error('Erro no login:', error);
       throw error;
@@ -68,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        // Ao recarregar a página, verifica a role novamente
         const userRole = await checkUserRole(firebaseUser.uid);
         setUser(firebaseUser);
         setRole(userRole);
@@ -86,8 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     role,
     isLoading,
     checkUserRole,
-    login,  // Adicionando a função login
-    logout  // Adicionando a função logout
+    login,
+    logout
   };
 
   return (

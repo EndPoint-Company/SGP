@@ -1,13 +1,8 @@
-// src/features/appointments/components/AppointmentsManager.tsx
-
-import React, { useState, useMemo } from "react";
+import React from "react";
 import RequestCard from "./RequestCard";
 import AppointmentCard from "./AppointmentCard";
 import { Input } from "../../../components/ui/input";
-import { CalendarDays, RefreshCw, X, Check } from "lucide-react";
-import { useProcessedAppointments } from "../hooks/useProcessedAppointments";
-import { updateConsultaStatus } from "../services/appointmentService";
-
+import { useAppointmentsManager } from "../hooks/useAppointmentsManager"; // Novo Hook
 
 interface AppointmentsManagerProps {
   userId: string;
@@ -15,73 +10,18 @@ interface AppointmentsManagerProps {
 }
 
 export default function AppointmentsManager({ userId, userRole }: AppointmentsManagerProps) {
-  const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<string>(
-    userRole === "psicologo" ? "solicitacoes" : "agendados"
-  );
-
-  const { consultas, isLoading, error, refetch } = useProcessedAppointments(userId, userRole);
-
-  const handleUpdateStatus = async (id: string, status: "confirmada" | "cancelada") => {
-    try {
-      await updateConsultaStatus(id, status);
-      refetch(); // Recarrega os dados após a atualização.
-    } catch (updateError) {
-      console.error("Falha ao atualizar status:", updateError);
-      // Opcional: Mostrar um erro para o usuário.
-    }
-  };
-
-  const psychologistTabs = [
-      { id: "solicitacoes", label: "Solicitações", icon: RefreshCw },
-      { id: "agendados", label: "Agendados", icon: Check },
-      { id: "cancelados", label: "Cancelados", icon: X },
-      { id: "passados", label: "Passados", icon: CalendarDays },
-  ];
-
-  const studentTabs = [
-      { id: "solicitacoes", label: "Solicitações", icon: RefreshCw },
-      { id: "agendados", label: "Agendados", icon: Check },
-      { id: "cancelados", label: "Cancelados", icon: X },
-      { id: "passados", label: "Passados", icon: CalendarDays },
-  ];
-
-  const tabs = userRole === 'psicologo' ? psychologistTabs : studentTabs;
-
-  const filteredData = useMemo(() => {
-    if (!Array.isArray(consultas)) return [];
-    
-    const now = new Date();
-
-    let dataToFilter = consultas;
-
-    switch (activeTab) {
-      case 'solicitacoes':
-        dataToFilter = consultas.filter(item => item.status === 'aguardando aprovacao');
-        break;
-      case 'agendados':
-        dataToFilter = consultas.filter(item => item.status === 'confirmada');
-        break;
-      case 'cancelados':
-        dataToFilter = consultas.filter(item => item.status === 'cancelada');
-        break;
-      case 'passados':
-        dataToFilter = consultas.filter(item => new Date(item.inicio) < now && item.status !== 'cancelada');
-        break;
-      default:
-        dataToFilter = [];
-        break;
-    }
-
-    if (search) {
-      return dataToFilter.filter(item =>
-        item.participantName.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-
-    return dataToFilter;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, search, consultas, userRole]);
+  // Lógica delegada ao Hook
+  const {
+    search,
+    setSearch,
+    activeTab,
+    setActiveTab,
+    tabs,
+    filteredData,
+    isLoading,
+    error,
+    updateStatus
+  } = useAppointmentsManager(userId, userRole);
 
   if (isLoading) {
     return <div className="text-center p-8 text-gray-500">A carregar agendamentos...</div>;
@@ -123,7 +63,6 @@ export default function AppointmentsManager({ userId, userRole }: AppointmentsMa
       <div className="flex gap-4 flex-wrap">
         {filteredData.length > 0 ? (
           filteredData.map((item) =>
-            // ATUALIZADO: O RequestCard só é renderizado para o psicólogo no separador de solicitações.
             activeTab === "solicitacoes" && userRole === "psicologo" ? (
               <RequestCard
                 key={item.id}
@@ -132,11 +71,10 @@ export default function AppointmentsManager({ userId, userRole }: AppointmentsMa
                 date={item.date}
                 time={item.time}
                 avatarUrl={item.participantAvatarUrl}
-                onAccept={() => handleUpdateStatus(item.id, "confirmada")}
-                onReject={() => handleUpdateStatus(item.id, "cancelada")}
+                onAccept={() => updateStatus(item.id, "confirmada")}
+                onReject={() => updateStatus(item.id, "cancelada")}
               />
             ) : (
-              // Para todos os outros casos, incluindo as solicitações do aluno, renderiza o AppointmentCard.
               <AppointmentCard
                 key={item.id}
                 name={item.participantName}
@@ -145,10 +83,9 @@ export default function AppointmentsManager({ userId, userRole }: AppointmentsMa
                 time={item.time}
                 status={item.status}
                 avatarUrl={item.participantAvatarUrl || ""}
-                // ATUALIZADO: O aluno pode cancelar tanto agendamentos como solicitações.
                 onCancel={
                   (activeTab === "agendados" || (activeTab === "solicitacoes" && userRole === "aluno"))
-                    ? () => handleUpdateStatus(item.id, "cancelada")
+                    ? () => updateStatus(item.id, "cancelada")
                     : undefined
                 }
               />
