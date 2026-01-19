@@ -1,7 +1,6 @@
-// src/features/appointments/services/appointmentService.ts
-
 import apiClient from "../../../services/apiClient";
 import type { Consulta, NewConsulta, ConsultaStatus } from "../types";
+import { toDomain } from "../mappers/appointmentMappers"; // Importa o Mapper centralizado
 import { AxiosError } from "axios";
 
 interface ApiErrorResponse {
@@ -12,9 +11,6 @@ interface ApiErrorResponse {
 const API_TIMEOUT = 10000;
 
 export const appointmentService = {
-  /**
-   * Busca todas as consultas associadas a um ID de psicólogo.
-   */
   async getByPsicologoId(psicologoId: string): Promise<Consulta[]> {
     try {
       const response = await apiClient.get<Consulta[]>('/consultas/psicologo', { 
@@ -22,8 +18,9 @@ export const appointmentService = {
         timeout: API_TIMEOUT 
       });
       
+      // Usa toDomain em vez de normalizeConsultaDates
       if (Array.isArray(response.data)) {
-        return response.data.map(c => appointmentService.normalizeConsultaDates(c));
+        return response.data.map(toDomain);
       }
       return [];
 
@@ -35,9 +32,6 @@ export const appointmentService = {
     }
   },
 
-  /**
-   * Busca todas as consultas associadas a um ID de aluno.
-   */
   async getByAlunoId(alunoId: string): Promise<Consulta[]> {
     try {
       const response = await apiClient.get<Consulta[]>('/consultas/aluno', {
@@ -46,7 +40,7 @@ export const appointmentService = {
       });
 
       if (Array.isArray(response.data)) {
-        return response.data.map(c => appointmentService.normalizeConsultaDates(c));
+        return response.data.map(toDomain);
       }
       return [];
 
@@ -58,38 +52,29 @@ export const appointmentService = {
     }
   },
 
-  /**
-   * Cria uma nova consulta.
-   */
   async create(consultaData: NewConsulta): Promise<Consulta> {
     try {
-      appointmentService.validateConsultaData(consultaData);
+      // Removemos validateConsultaData (deve ser feito no form/schema)
       const response = await apiClient.post<Consulta>("/consultas", consultaData, { 
         timeout: API_TIMEOUT 
       });
-      return appointmentService.normalizeConsultaDates(response.data);
+      return toDomain(response.data);
     } catch (error) {
       throw appointmentService.handleError(error, "Erro ao criar a consulta.");
     }
   },
 
-  /**
-   * Atualiza o status de uma consulta.
-   */
   async updateStatus(id: string, status: Extract<ConsultaStatus, "confirmada" | "cancelada">): Promise<Consulta> {
     try {
       const response = await apiClient.patch<Consulta>(`/consultas/${id}/status`, { status }, { 
         timeout: API_TIMEOUT 
       });
-      return appointmentService.normalizeConsultaDates(response.data);
+      return toDomain(response.data);
     } catch (error) {
       throw appointmentService.handleError(error, "Erro ao atualizar o status da consulta.");
     }
   },
 
-  /**
-   * Cancela (deleta) uma consulta.
-   */
   async cancel(id: string): Promise<void> {
     try {
       await apiClient.delete(`/consultas/${id}`, { timeout: API_TIMEOUT });
@@ -98,13 +83,10 @@ export const appointmentService = {
     }
   },
 
-  /**
-   * Busca uma consulta específica pelo seu ID.
-   */
   async getById(id: string): Promise<Consulta | null> {
     try {
       const response = await apiClient.get<Consulta>(`/consultas/${id}`, { timeout: API_TIMEOUT });
-      return appointmentService.normalizeConsultaDates(response.data);
+      return toDomain(response.data);
     } catch (error) {
       if (appointmentService.isAxiosError(error) && error.response?.status === 404) {
         return null;
@@ -112,50 +94,7 @@ export const appointmentService = {
       throw appointmentService.handleError(error, "Erro ao buscar a consulta.");
     }
   },
-
-  /**
-   * Valida os dados para a criação de uma nova consulta.
-   */
-  validateConsultaData(data: NewConsulta): void {
-    const errors: string[] = [];
-    if (!data.alunoId?.trim()) errors.push("ID do aluno é obrigatório.");
-    if (!data.psicologoId?.trim()) errors.push("ID do psicólogo é obrigatório.");
-    if (!data.horarioId?.trim()) errors.push("ID do horário é obrigatório.");
-
-    if (errors.length > 0) {
-      throw new Error(errors.join(", "));
-    }
-  },
-
-  /**
-   * CORRIGIDO: Função de normalização de datas agora é mais segura.
-   * Ela verifica se a data recebida da API é válida antes de tentar formatá-la.
-   */
-  normalizeConsultaDates(consulta: Consulta): Consulta {
-    const safeFormat = (dateString: string): string => {
-      if (!dateString) {
-        return dateString;
-      }
-      const date = new Date(dateString);
-      // Verifica se a data é inválida. Se for, retorna a string original.
-      if (isNaN(date.getTime())) {
-        console.warn(`[normalizeConsultaDates] Data inválida recebida da API: "${dateString}"`);
-        return dateString;
-      }
-      return date.toISOString();
-    };
-
-    return {
-      ...consulta,
-      inicio: safeFormat(consulta.inicio),
-      fim: safeFormat(consulta.fim),
-      dataAgendamento: safeFormat(consulta.dataAgendamento),
-    };
-  },
   
-  /**
-   * Manipulador de erros padrão para o serviço.
-   */
   handleError(error: unknown, defaultMessage: string): Error {
     if (appointmentService.isAxiosError(error)) {
       const errorData = error.response?.data as ApiErrorResponse;
@@ -164,8 +103,8 @@ export const appointmentService = {
 
       switch (status) {
         case 400: return new Error(errorMessage || "Dados inválidos enviados.");
-        case 401: return new Error("Autenticação necessária.");
-        case 403: return new Error("Você não tem permissão para esta ação.");
+        case 401: return new Error("Sessão expirada. Faça login novamente.");
+        case 403: return new Error("Você não tem permissão para realizar esta ação.");
         case 404: return new Error("Recurso não encontrado.");
         case 500: return new Error("Erro interno no servidor.");
         default: return new Error(errorMessage || defaultMessage);
@@ -174,15 +113,11 @@ export const appointmentService = {
     return error instanceof Error ? error : new Error(defaultMessage);
   },
 
-  /**
-   * Verificador de tipo para erros do Axios.
-   */
   isAxiosError(error: unknown): error is AxiosError {
     return typeof error === "object" && error !== null && "isAxiosError" in error;
   },
 };
 
-// Exportações individuais para facilitar o uso em outras partes do código.
 export const getConsultasByPsicologoId = appointmentService.getByPsicologoId;
 export const getConsultasByAlunoId = appointmentService.getByAlunoId;
 export const createConsulta = appointmentService.create;

@@ -1,11 +1,8 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-// Corrigido: Importa o tipo Consulta do local correto e centralizado
 import type { Consulta, ConsultaStatus } from "../../../features/appointments/types";
-// Corrigido: Apenas a função de formatar o tempo é necessária aqui
 import { formatAppointmentDate as formatEventTime } from "../../../utils/dataHelpers";
-
 
 const daysOfWeek = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const monthNames = [
@@ -13,7 +10,6 @@ const monthNames = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
-// Adiciona a propriedade opcional 'participantName' que é recebida da página pai
 type EventConsulta = Consulta & { 
   id: string;
   alunoId: string;
@@ -23,6 +19,7 @@ type EventConsulta = Consulta & {
   participantName?: string;
 };
 
+// 1. ATUALIZAÇÃO: Adicionadas novas props para suporte ao Hover
 interface ContinuousCalendarProps {
   role: "aluno" | "psicologo";
   currentUserId: string;
@@ -35,8 +32,11 @@ interface ContinuousCalendarProps {
   selectedPendingDays?: Date[];
   viewingDay?: Date | null;
   className?: string;
+  
+  // Novas props
+  previewDays?: Date[];
+  onDayHover?: (date: Date) => void;
 }
-
 
 export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({
   role,
@@ -49,6 +49,9 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({
   selectedPendingDays = [],
   viewingDay = null,
   className = "",
+  // Destructuring das novas props com valor padrão
+  previewDays = [],
+  onDayHover
 }) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -173,13 +176,11 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({
 
  useEffect(() => {
     if (!scrollToTarget) return;
-    // CORRIGIDO: Passa o objeto Date diretamente
     scrollToDay(scrollToTarget.date, true, scrollToTarget.instant);
     setScrollToTarget(null);
   }, [scrollToTarget]); 
 
   useEffect(() => {
-    // CORRIGIDO: Passa o objeto Date diretamente
     scrollToDay(new Date(), true, true);
 
     const calendarContainer = document.querySelector(".calendar-container");
@@ -258,9 +259,17 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({
               const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6;
               const hasEvents = (eventsByDate[dateKey] || []).length > 0;
               const isAvailable = availability[dateKey] && availability[dateKey].length > 0;
+              
+              // Verificação de Estado
               const isPending = role === "psicologo" && selectedPendingDays.some((d) => d.getTime() === currentDate.getTime());
               const isViewing = viewingDay ? viewingDay.getTime() === currentDate.getTime() : false;
-              const isHighlighted = isPending || isViewing;
+              
+              // 2. ATUALIZAÇÃO: Verifica se é dia de Preview
+              const isPreview = role === "psicologo" && previewDays.some((d) => d.getTime() === currentDate.getTime());
+
+              // 3. ATUALIZAÇÃO: Highlight inclui preview
+              const isHighlighted = isPending || isViewing || isPreview;
+
               const isTodayDate = currentDate.getTime() === today.getTime();
               const isNewMonth = day === 1 && isCurrentMonth;
 
@@ -268,7 +277,8 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({
               let dayBgColor = "bg-slate-100";
               let textColorClass = "text-slate-800";
               
-              if (isPending) { dayBgColor = "bg-blue-50 z-40"; }
+              // 4. ATUALIZAÇÃO: Estilo de cor inclui Preview
+              if (isPending || isPreview) { dayBgColor = "bg-blue-50 z-40"; }
               else if (!isCurrentMonth || isPast || isWeekend) { dayBgColor = "bg-slate-100"; textColorClass = "text-slate-400"; }
               else if (isAvailable) { dayBgColor = "bg-white"; }
               else { dayBgColor = "bg-slate-50"; }
@@ -286,6 +296,8 @@ export const ContinuousCalendar: React.FC<ContinuousCalendarProps> = ({
                   ref={(el) => { dayRefs.current.set(dateKey, el); }}
                   data-month={currentDate.getMonth()}
                   data-day={currentDate.getDate()}
+                  // 5. ATUALIZAÇÃO: Evento de Hover
+                  onMouseEnter={() => onDayHover && onDayHover(currentDate)}
                   onClick={() => {
                     if (isClickable) {
                       if (role === "psicologo" && isSelectionMode) { onPendingDaySelect(currentDate); }

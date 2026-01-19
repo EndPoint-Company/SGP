@@ -1,9 +1,7 @@
-// src/features/appointments/hooks/useProcessedAppointments.ts
-
 import { useState, useEffect, useCallback } from 'react';
 import type { ProcessedConsulta, Consulta, User } from '../types';
 import { getConsultasByPsicologoId, getConsultasByAlunoId } from '../services/appointmentService';
-import { mapApiDataToConsulta } from '../mappers/appointmentMappers';
+import { toDomain } from '../mappers/appointmentMappers'; // ATUALIZADO: Importando toDomain
 import { useUserData } from '../../../contexts/UserDataProvider';
 
 /**
@@ -33,7 +31,9 @@ export function useProcessedAppointments(userId: string, userRole: 'aluno' | 'ps
         apiResponse = await getConsultasByAlunoId(userId);
       }
       
-      const mappedConsultas = apiResponse.map(mapApiDataToConsulta);
+      // ATUALIZADO: Usando o mapper toDomain
+      const mappedConsultas = apiResponse.map(toDomain);
+      
       const processedData = mappedConsultas.map(c => 
           processConsultaForUI(c, userRole, findPsicologoById, findAlunoById)
       );
@@ -55,7 +55,6 @@ export function useProcessedAppointments(userId: string, userRole: 'aluno' | 'ps
   return { consultas, isLoading, error, refetch: fetchData };
 }
 
-
 function processConsultaForUI(
   consulta: Consulta,
   userRole: 'aluno' | 'psicologo',
@@ -70,10 +69,9 @@ function processConsultaForUI(
     participant = findPsicologoById(consulta.psicologoId);
   }
 
-  // --- LÓGICA DE FORMATAÇÃO ATUALIZADA ---
+  // A data já vem normalizada pelo toDomain, mas garantimos a instância de Date aqui
   const startDate = new Date(consulta.inicio);
 
-  // Formata a data para: "quinta-feira, 31 de julho de 2025"
   let formattedDate = new Intl.DateTimeFormat('pt-BR', {
     weekday: 'long',
     year: 'numeric',
@@ -82,24 +80,19 @@ function processConsultaForUI(
     timeZone: 'America/Sao_Paulo',
   }).format(startDate);
 
-  // Capitaliza a primeira letra do dia da semana.
   formattedDate = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
 
-  // Formata a hora de início.
   const startTime = startDate.toLocaleTimeString('pt-BR', {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'America/Sao_Paulo',
   });
   
-  // ATUALIZADO: A formatação agora mostra apenas a hora de início.
-  const formattedTime = startTime;
-
   return {
     ...consulta,
     participantName: participant?.nome || 'Desconhecido',
     participantAvatarUrl: participant?.avatarUrl,
     date: formattedDate,
-    time: formattedTime,
+    time: startTime,
   };
 }
