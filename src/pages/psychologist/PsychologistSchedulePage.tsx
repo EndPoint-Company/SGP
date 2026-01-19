@@ -7,7 +7,7 @@ import { useToast } from '../../contexts/ToastProvider';
 
 export default function PsychologistSchedulePage() {
   const { user, isLoading: isAuthLoading } = useAuth();
-  const { addToast } = useToast();
+  const { showToast } = useToast(); // CORREÇÃO: addToast -> showToast
   
   const { 
     consultas, 
@@ -21,15 +21,17 @@ export default function PsychologistSchedulePage() {
   // Ação: Salvar Disponibilidade (VERDE)
   const handleSave = async (data: Record<string, string[]>) => {
     const result = await saveAvailability(data);
-    addToast(result.message, result.success ? 'success' : 'error');
+    showToast(result.message, result.success ? 'success' : 'error'); // CORREÇÃO
   };
 
-  // Ação: Bloquear Dia (VERMELHO)
+  // Ação: Bloquear Dia
   const handleBlock = async (date: Date) => {
     const result = await blockDay(date);
     
-    const toastType = result.success ? 'error' : 'error'; 
-    addToast(result.message, toastType);
+    // CORREÇÃO: Se o bloqueio foi um sucesso, usamos 'success' (verde) ou 'info' (azul).
+    // Usar 'error' (vermelho) em caso de sucesso pode confundir o usuário.
+    const toastType = result.success ? 'success' : 'error'; 
+    showToast(result.message, toastType); 
   };
 
   const isLoading = isAuthLoading || isDataLoading;
